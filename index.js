@@ -84,9 +84,8 @@ bot.onText(/\/logout/, (msg, match) => {
 bot.onText(/\/notas\s?(.{1,})?/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
-    .then(({ career, period }) => {
-      return user.session.getGrades(period.peri_ccod, career.carr_ccod)
-    })
+    .then(({ career, period }) =>
+      user.session.getGrades(period.peri_ccod, career.carr_ccod))
     .then(({ informacion_notas: { listado_asignaturas } }) => {
       const term = match[1] ? removeDiacritics(match[1]) : null
       const list = term
@@ -123,6 +122,45 @@ bot.onText(/\/notas\s?(.{1,})?/, (msg, match) => {
           bot.sendMessage(msg.from.id, message, { parse_mode: 'markdown' })
         }
       })
+    })
+})
+
+bot.onText(/\/horario\s?(\d)?/, (msg, match) => {
+  const user = init(msg.from.id)
+  user && user.login()
+    .then(({ period }) => user.session.getSchedule(period.peri_ccod))
+    .then((data) => {
+      let schedule = data.filter(item => {
+        const now = new Date()
+        const classDate = new Date(item.start)
+        return classDate.getMonth() === now.getMonth() &&
+          classDate.getDate() === now.getDate()
+      })
+
+      if (match[1]) {
+        schedule = data.filter(item => {
+          const now = new Date()
+          const classDate = new Date(item.start)
+          return classDate.getMonth() === now.getMonth() &&
+            classDate.getDay() === parseInt(match[1])
+        })
+      }
+
+      let message = schedule.reduce((prev, curr) => {
+        if (!curr.data) return prev
+        if (match[1]) {
+          prev += `*Fecha: ${curr.data.fecha}*\n`
+        }
+        prev += `*Asignatura*: ${curr.data.asignatura}\n`
+        prev += `*Sala*: ${curr.data.sala}\n`
+        prev += `*Inicio*: ${curr.data.hora_inicio}\n`
+        prev += `*Término*: ${curr.data.hora_termino}\n`
+        prev += `*Profesor*: ${curr.data.profesor}\n\n`
+        return prev
+      }, '')
+
+      if (!message) message = 'No hay clase asignada.'
+      bot.sendMessage(msg.from.id, message, { parse_mode: 'markdown' })
     })
 })
 
