@@ -11,7 +11,7 @@
     "url": "git+https://github.com/mallendeo/inacap-telegram-bot.git"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/mallendeo/inacap-telegram-bot/issues"
   },
