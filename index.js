@@ -164,7 +164,7 @@ bot.onText(/\/horario(?:@\w{1,})?\s?(\d)?/, (msg, match) => {
       }
 
       let message = schedule.reduce((prev, curr) => {
-        if (!curr.data) return prev
+        if (!curr.data.asignatura) return prev
         if (match[1]) {
           prev += `*Fecha: ${curr.data.fecha}*\n`
         }
