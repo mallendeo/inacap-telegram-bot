@@ -81,7 +81,10 @@ bot.onText(/\/logout/, (msg, match) => {
   }
 })
 
-bot.onText(/\/notas\s?(.{1,})?/, (msg, match) => {
+bot.onText(/\/start/, (msg, match) =>
+  bot.sendMessage(msg.from.id, 'Ingresa usando /login rut contraseña'))
+
+bot.onText(/\/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
     .then(({ career, period }) =>
@@ -97,7 +100,7 @@ bot.onText(/\/notas\s?(.{1,})?/, (msg, match) => {
         : listado_asignaturas
 
       if (!list.length && term) {
-        bot.sendMessage(msg.from.id, 'No se encontró la asignatura')
+        bot.sendMessage(msg.chat.id, 'No se encontró la asignatura')
         return
       }
 
@@ -110,7 +113,7 @@ bot.onText(/\/notas\s?(.{1,})?/, (msg, match) => {
         }, '')
 
         if (!gradesList && term) {
-          bot.sendMessage(msg.from.id, 'No hay notas para esta asignatura.')
+          bot.sendMessage(msg.chat.id, 'No hay notas para esta asignatura.')
           return
         }
 
@@ -119,13 +122,13 @@ bot.onText(/\/notas\s?(.{1,})?/, (msg, match) => {
             `*Profesor*: ${item.nombre_profesor}\n` +
             `*Notas*: \n${gradesList}`
 
-          bot.sendMessage(msg.from.id, message, { parse_mode: 'markdown' })
+          bot.sendMessage(msg.chat.id, message, { parse_mode: 'markdown' })
         }
       })
     })
 })
 
-bot.onText(/\/horario\s?(\d)?/, (msg, match) => {
+bot.onText(/\/horario(?:@\w{1,})?\s?(\d)?/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
     .then(({ period }) => user.session.getSchedule(period.peri_ccod))
@@ -160,7 +163,7 @@ bot.onText(/\/horario\s?(\d)?/, (msg, match) => {
       }, '')
 
       if (!message) message = 'No hay clase asignada.'
-      bot.sendMessage(msg.from.id, message, { parse_mode: 'markdown' })
+      bot.sendMessage(msg.chat.id, message, { parse_mode: 'markdown' })
     })
 })
 
