@@ -1,3 +1,5 @@
+'use strict'
+
 const inacap = require('./lib/inacap')
 const removeDiacritics = require('diacritics').remove
 const fileAsync = require('lowdb/lib/file-async')
@@ -73,7 +75,9 @@ bot.onText(/\/login (.{1,}) (.{1,})/, (msg, match) => {
 })
 
 bot.onText(/\/logout/, (msg, match) => {
-  console.log(match)
+  if (db.get('users').remove({ id: msg.from.id })) {
+    bot.sendMessage(msg.from.id, 'Sesión terminada.')
+  }
 })
 bot.onText(/\/notas\s?(.{1,})?/, (msg, match) => {
   const user = init(msg.from.id)
@@ -119,3 +123,5 @@ bot.onText(/\/notas\s?(.{1,})?/, (msg, match) => {
       })
     })
 })
+
+console.log('Starting bot...')
