@@ -18,6 +18,7 @@
   "homepage": "https://github.com/mallendeo/inacap-telegram-bot#readme",
   "dependencies": {
     "cheerio": "^0.22.0",
+    "cryptr": "^2.0.0",
     "diacritics": "^1.2.3",
     "lodash": "^4.16.3",
     "lowdb": "^0.13.1",

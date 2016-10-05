@@ -4,8 +4,21 @@ const inacap = require('./lib/inacap')
 const removeDiacritics = require('diacritics').remove
 const fileAsync = require('lowdb/lib/file-async')
 const low = require('lowdb')
+const Cryptr = require('cryptr')
 
-const db = low('db.json', { storage: fileAsync })
+if (!process.env.SECRET_KEY || !process.env.TELEGRAM_TOKEN) {
+  throw Error('SECRET_KEY and TELEGRAM_TOKEN required!')
+}
+
+const cryptr = new Cryptr(process.env.SECRET_KEY)
+const db = low('db.json', {
+  storage: fileAsync,
+  format: {
+    deserialize: str => JSON.parse(cryptr.decrypt(str)),
+    serialize: obj => cryptr.encrypt(JSON.stringify(obj))
+  }
+})
+
 db.defaults({ users: [] }).value()
 
 const TelegramBot = require('node-telegram-bot-api')
@@ -16,6 +29,7 @@ const bot = new TelegramBot(token, { polling: true })
 // Helpers
 const atob = str => new Buffer(str).toString('base64')
 const btoa = str => new Buffer(str, 'base64').toString('ascii')
+
 
 const init = id => {
   const session = inacap()
