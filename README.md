@@ -6,7 +6,7 @@
 $ git clone https://github.com/mallendeo/inacap-telegram-bot
 $ cd inacap-telegram-bot
 $ npm i
-$ npm start
+$ TELEGRAM_TOKEN="token" npm start
 ```
 
 # License
