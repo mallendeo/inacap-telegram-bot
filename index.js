@@ -114,7 +114,7 @@ bot.onText(/\/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
         : listado_asignaturas
 
       if (!list.length && term) {
-        bot.sendMessage(msg.chat.id, 'No se encontró la asignatura')
+        bot.sendMessage(msg.chat.id, 'No se encontró la asignatura.')
         return
       }
 
@@ -176,7 +176,7 @@ bot.onText(/\/horario(?:@\w{1,})?\s?(\d)?/, (msg, match) => {
         return prev
       }, '')
 
-      if (!message) message = 'No hay clase asignada.'
+      if (!message) message = 'No hay clases asignadas para hoy.'
       bot.sendMessage(msg.chat.id, message, { parse_mode: 'markdown' })
     })
 })
