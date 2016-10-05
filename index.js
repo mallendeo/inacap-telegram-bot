@@ -49,7 +49,7 @@ bot.onText(/\/login (.{1,}) (.{1,})/, (msg, match) => {
   const password = match[2]
 
   if (db.get('users').find({ id: msg.from.id }).value()) {
-    bot.sendMessage(msg.from.id, 'Ya se encuentra logueado.')
+    bot.sendMessage(msg.from.id, 'Ya te encuentras logueado.')
     return
   }
 
@@ -57,7 +57,7 @@ bot.onText(/\/login (.{1,}) (.{1,})/, (msg, match) => {
 
   inacap().login(rut, password)
     .then(() => {
-      bot.sendMessage(msg.from.id, 'Login exitoso, para salir use /logout')
+      bot.sendMessage(msg.from.id, 'Login exitoso, para salir usa /logout')
 
       return db.get('users')
         .push({
@@ -75,10 +75,12 @@ bot.onText(/\/login (.{1,}) (.{1,})/, (msg, match) => {
 })
 
 bot.onText(/\/logout/, (msg, match) => {
-  if (db.get('users').remove({ id: msg.from.id })) {
+  const removed = db.get('users').remove({ id: msg.from.id }).value()
+  if (removed) {
     bot.sendMessage(msg.from.id, 'Sesión terminada.')
   }
 })
+
 bot.onText(/\/notas\s?(.{1,})?/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
@@ -96,7 +98,7 @@ bot.onText(/\/notas\s?(.{1,})?/, (msg, match) => {
         : listado_asignaturas
 
       if (!list.length && term) {
-        bot.sendMessage(msg.from.id, 'No se encontró asignatura')
+        bot.sendMessage(msg.from.id, 'No se encontró la asignatura')
         return
       }
 
