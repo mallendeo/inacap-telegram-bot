@@ -11,7 +11,7 @@ if (!process.env.SECRET_KEY || !process.env.TELEGRAM_TOKEN) {
 }
 
 const cryptr = new Cryptr(process.env.SECRET_KEY)
-const db = low('db.json', {
+const db = low('data/db.json', {
   storage: fileAsync,
   format: {
     deserialize: str => JSON.parse(cryptr.decrypt(str)),
