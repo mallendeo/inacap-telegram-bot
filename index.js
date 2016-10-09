@@ -23,8 +23,7 @@ db.defaults({ users: [] }).value()
 
 const TelegramBot = require('node-telegram-bot-api')
 
-const token = process.env.TELEGRAM_TOKEN
-const bot = new TelegramBot(token, { polling: true })
+const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true })
 
 // Helpers
 const atob = str => new Buffer(str).toString('base64')
@@ -97,6 +96,9 @@ bot.onText(/\/logout/, (msg, match) => {
 
 bot.onText(/\/start/, (msg, match) =>
   bot.sendMessage(msg.from.id, 'Ingresa usando /login rut contraseña'))
+
+bot.onText(/doot/, (msg, match) =>
+  bot.sendMessage(msg.chat.id, '🎺🎺💀'))
 
 bot.onText(/\/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
   const user = init(msg.from.id)
