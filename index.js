@@ -38,7 +38,11 @@ const init = id => {
     return false
   }
 
-  if (user.expires < Date.now()) {
+  if (
+    (user.expires < Date.now()) ||
+    !user.period ||
+    !user.career
+  ) {
     const session = inacap()
     let period = null
     bot.sendMessage(id, 'Re-logueando Inacap')
@@ -77,7 +81,7 @@ const init = id => {
   }
 }
 
-bot.onText(/\/login (.{1,}) (.{1,})/, (msg, match) => {
+bot.onText(/login (.{1,}) (.{1,})/, (msg, match) => {
   const rut = match[1]
   const password = match[2]
 
@@ -109,19 +113,19 @@ bot.onText(/\/login (.{1,}) (.{1,})/, (msg, match) => {
     })
 })
 
-bot.onText(/\/logout/, (msg, match) => {
+bot.onText(/logout/, (msg, match) => {
   const removed = db.get('users').remove({ id: msg.from.id }).value()
   if (removed) {
     bot.sendMessage(msg.from.id, 'Sesión terminada.')
   }
 })
 
-bot.onText(/\/start/, (msg, match) =>
+bot.onText(/start/, (msg, match) =>
   bot.sendMessage(msg.from.id, 'Ingresa usando /login rut contraseña'))
 
 bot.onText(/doot/, msg => bot.sendMessage(msg.chat.id, '🎺🎺💀'))
 
-bot.onText(/\/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
+bot.onText(/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
     .then(({ career, period }) =>
@@ -169,7 +173,7 @@ bot.onText(/\/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
     })
 })
 
-bot.onText(/\/horario(?:@\w{1,})?\s?(\d)?/, (msg, match) => {
+bot.onText(/horario(?:@\w{1,})?\s?(\d)?/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
     .then(({ period }) => user.session.getSchedule(period.peri_ccod))
