@@ -1,7 +1,7 @@
 'use strict'
 
 const inacap = require('./lib/inacap')
-const removeDiacritics = require('diacritics').remove
+const { deburr, capitalize, words } = require('lodash')
 const fileAsync = require('lowdb/lib/file-async')
 const low = require('lowdb')
 const Cryptr = require('cryptr')
@@ -28,10 +28,9 @@ const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true })
 // Helpers
 const atob = str => new Buffer(str).toString('base64')
 const btoa = str => new Buffer(str, 'base64').toString('ascii')
-
+const minutes = (n = 15) => Date.now() + n * 60 * 1000
 
 const init = id => {
-  const session = inacap()
   const user = db.get('users').find({ id }).value()
 
   if (!user) {
@@ -39,20 +38,41 @@ const init = id => {
     return false
   }
 
-  let period = null
-  return {
-    login: () =>
-      session.login(btoa(user.rut), btoa(user.password))
-        .then(() => session.getPeriods())
+  if (user.expires < Date.now()) {
+    const session = inacap()
+    let period = null
+    bot.sendMessage(id, 'Re-logueando Inacap')
+
+    return {
+      login: () => session
+        .login(btoa(user.rut), btoa(user.password))
+        .then(({ cookies }) => {
+          user.cookies = cookies
+          user.expires = minutes()
+          return session.getPeriods()
+        })
         .then(periods => {
           period = periods[0]
+          user.period = period
           return session.getCareers(period.peri_ccod)
         })
-        .then(careers => ({
-          period,
-          career: careers[0]
-        })
-      ),
+        .then(careers => {
+          const career = careers[0]
+          user.career = career
+
+          return {
+            period,
+            career
+          }
+        }),
+      session
+    }
+  }
+
+  const session = inacap(user.cookies)
+  const { period, career } = user
+  return {
+    login: () => Promise.resolve({ period, career }),
     session
   }
 }
@@ -69,14 +89,16 @@ bot.onText(/\/login (.{1,}) (.{1,})/, (msg, match) => {
   bot.sendMessage(msg.from.id, 'Ingresando a Inacap...')
 
   inacap().login(rut, password)
-    .then(() => {
+    .then(({ cookies }) => {
       bot.sendMessage(msg.from.id, 'Login exitoso, para salir usa /logout')
 
       return db.get('users')
         .push({
           id: msg.from.id,
           rut: atob(rut),
-          password: atob(password)
+          password: atob(password),
+          cookies,
+          expires: minutes()
         })
         .last()
         .value()
@@ -97,8 +119,7 @@ bot.onText(/\/logout/, (msg, match) => {
 bot.onText(/\/start/, (msg, match) =>
   bot.sendMessage(msg.from.id, 'Ingresa usando /login rut contraseña'))
 
-bot.onText(/doot/, (msg, match) =>
-  bot.sendMessage(msg.chat.id, '🎺🎺💀'))
+bot.onText(/doot/, msg => bot.sendMessage(msg.chat.id, '🎺🎺💀'))
 
 bot.onText(/\/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
   const user = init(msg.from.id)
@@ -106,11 +127,11 @@ bot.onText(/\/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
     .then(({ career, period }) =>
       user.session.getGrades(period.peri_ccod, career.carr_ccod))
     .then(({ informacion_notas: { listado_asignaturas } }) => {
-      const term = match[1] ? removeDiacritics(match[1]) : null
+      const term = match[1] ? deburr(match[1]) : null
       const list = term
         ? listado_asignaturas.filter(item => (
-            removeDiacritics(item.nombre_asigntura.toLowerCase()).includes(term) ||
-            removeDiacritics(item.nombre_profesor.toLowerCase()).includes(term)
+            deburr(item.nombre_asigntura.toLowerCase()).includes(term) ||
+            deburr(item.nombre_profesor.toLowerCase()).includes(term)
           )
         )
         : listado_asignaturas
@@ -120,11 +141,15 @@ bot.onText(/\/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
         return
       }
 
+      const cookies = user.session.cookies
+      const nombre = cookies.getValue(cookies.get('NOMBRE_COMPLETO_H'))
+      let message = `*${words(nombre).join(' ')}*\n\n`
+
       list.forEach(item => {
         const gradesList = item.listado_evaluaciones.reduce((prev, curr) => {
-          const { fecha, nota, ponderacion } = curr
+          const { fecha, nota, ponderacion, prom_calificacion } = curr
           if (!nota) return prev
-          prev += `\t\t*${fecha}* | nota: *${nota}* | pon: *${ponderacion}* | curso: ${curr.prom_calificacion}\n`
+          prev += `\t\t*${fecha}* | nota: *${nota}* | pon: *${ponderacion}* | curso: ${prom_calificacion}\n`
           return prev
         }, '')
 
@@ -134,13 +159,13 @@ bot.onText(/\/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
         }
 
         if (gradesList) {
-          const message = `*Asignatura*: ${item.nombre_asigntura}\n` +
+          message += `*${capitalize(item.nombre_asigntura)}*\n` +
             `*Profesor*: ${item.nombre_profesor}\n` +
-            `*Notas*: \n${gradesList}`
-
-          bot.sendMessage(msg.chat.id, message, { parse_mode: 'markdown' })
+            `*Notas*: \n${gradesList}\n`
         }
       })
+
+      bot.sendMessage(msg.chat.id, message, { parse_mode: 'markdown' })
     })
 })
 
