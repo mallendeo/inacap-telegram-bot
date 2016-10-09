@@ -11,8 +11,8 @@ $ TELEGRAM_TOKEN="token" SECRET_KEY="random" npm start
 
 ## Docker
 ```bash
-$ docker build -t "inacap-telegram-bot:dockerfile" .
-$ docker run -d -e TELEGRAM_TOKEN="token" -e SECRET_KEY="random" inacap-telegram-bot:dockerfile
+$ docker build -t "inacap-bot:dockerfile" .
+$ docker run --name inacap-bot -d -v ./:/var/app -e TELEGRAM_TOKEN="token" -e SECRET_KEY="random" inacap-bot:dockerfile
 ```
 
 # License

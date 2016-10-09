@@ -2,8 +2,11 @@ FROM node:latest
 
 MAINTAINER Mauricio Allende
 
-RUN npm install -g pm2
-RUN git clone https://github.com/mallendeo/inacap-telegram-bot
-RUN cd inacap-telegram-bot && npm i
+WORKDIR /opt/app
+COPY . /opt/app
+RUN mkdir -p /opt/app/data
 
-CMD ["pm2-docker", "./inacap-telegram-bot/index.js"]
+RUN npm install -g pm2
+RUN npm i
+
+CMD ["pm2-docker", "/opt/app/"]
