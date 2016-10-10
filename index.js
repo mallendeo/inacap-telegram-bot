@@ -28,9 +28,22 @@ const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true })
 // Helpers
 const atob = str => new Buffer(str).toString('base64')
 const btoa = str => new Buffer(str, 'base64').toString('ascii')
-const minutes = (n = 15) => Date.now() + n * 60 * 1000
+const minutes = (n = 20) => Date.now() + n * 60 * 1000
 
 const findUser = id => db.get('users').find({ id }).value()
+
+const autoLogin = user => {
+  if (user.autoLogin) return
+  user.autoLogin = true
+  setInterval(() => {
+    inacap()
+      .login(btoa(user.rut), btoa(user.password))
+      .then(({ cookies }) => {
+        user.cookies = cookies
+        user.expires = minutes()
+      })
+  }, minutes())
+}
 
 const updatePeriods = (session, user) => {
   let period = null
@@ -136,6 +149,10 @@ bot.onText(/start/, (msg, match) =>
   bot.sendMessage(msg.from.id, 'Ingresa usando /login rut contraseña'))
 
 // 3spooky5me
+bot.onText(/\/?autologin/, msg => {
+  autoLogin(findUser(msg.from.id))
+  bot.sendMessage(msg.chat.id, 'Autologin activado.')
+})
 bot.onText(/\/?doot/, msg => bot.sendMessage(msg.chat.id, '🎺🎺💀'))
 
 // Grades
