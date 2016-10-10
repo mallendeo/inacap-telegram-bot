@@ -88,7 +88,7 @@ const init = id => {
   }
 }
 
-bot.onText(/login (.{1,}) (.{1,})/, (msg, match) => {
+bot.onText(/^\/?login (.{1,}) (.{1,})$/, (msg, match) => {
   const rut = match[1]
   const password = match[2]
   const user = findUser(msg.from.id)
@@ -125,7 +125,7 @@ bot.onText(/login (.{1,}) (.{1,})/, (msg, match) => {
     })
 })
 
-bot.onText(/logout/, (msg, match) => {
+bot.onText(/\/?logout/, (msg, match) => {
   const removed = db.get('users').remove({ id: msg.from.id }).value()
   if (removed) {
     bot.sendMessage(msg.from.id, 'Sesión terminada.')
@@ -136,10 +136,10 @@ bot.onText(/start/, (msg, match) =>
   bot.sendMessage(msg.from.id, 'Ingresa usando /login rut contraseña'))
 
 // 3spooky5me
-bot.onText(/doot/, msg => bot.sendMessage(msg.chat.id, '🎺🎺💀'))
+bot.onText(/\/?doot/, msg => bot.sendMessage(msg.chat.id, '🎺🎺💀'))
 
 // Grades
-bot.onText(/n(?:\w{1,})?\s?(.{1,})?/, (msg, match) => {
+bot.onText(/^\/?n(?:\w{1,})?\s?(.{1,})?$/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
     .then(({ career, period }) =>
@@ -188,7 +188,7 @@ bot.onText(/n(?:\w{1,})?\s?(.{1,})?/, (msg, match) => {
 })
 
 // Schedule
-bot.onText(/h(?:\w{1,})?\s?(\w{1,})?/, (msg, match) => {
+bot.onText(/^\/?h(?:\w{1,})?\s?(\w{1,})?$/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
     .then(({ period }) => user.session.getSchedule(period.peri_ccod))
