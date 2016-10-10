@@ -22,47 +22,35 @@ const db = low(`${__dirname}/data/db.json`, {
 db.defaults({ users: [] }).value()
 
 const TelegramBot = require('node-telegram-bot-api')
-
 const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, { polling: true })
+
+const intervals = {}
 
 // Helpers
 const atob = str => new Buffer(str).toString('base64')
 const btoa = str => new Buffer(str, 'base64').toString('ascii')
-const minutes = (n = 20) => Date.now() + n * 60 * 1000
+const minutes = (n = 20) => n * 60 * 1000
 
 const findUser = id => db.get('users').find({ id }).value()
 
-const autoLogin = user => {
-  if (user.autoLogin) return
-  user.autoLogin = true
-  setInterval(() => {
-    inacap()
-      .login(btoa(user.rut), btoa(user.password))
-      .then(({ cookies }) => {
-        user.cookies = cookies
-        user.expires = minutes()
-      })
-  }, minutes())
-}
-
-const updatePeriods = (session, user) => {
-  let period = null
-  return session.getPeriods()
+const login = user => {
+  const session = inacap()
+  return session
+    .login(btoa(user.rut), btoa(user.password))
+    .then(({ cookies }) => {
+      user.cookies = cookies
+      return session.getPeriods()
+    })
     .then(periods => {
-      period = periods[0]
-      user.period = period
-      return session.getCareers(period.peri_ccod)
+      user.period = periods[0]
+      return session.getCareers(user.period.peri_ccod)
     })
     .then(careers => {
-      const career = careers[0]
-      user.career = career
-
-      return {
-        period,
-        career
-      }
+      user.career = careers[0]
     })
 }
+
+const autoLogin = user => setInterval(() => login(user), minutes())
 
 const init = id => {
   const user = findUser(id)
@@ -72,36 +60,13 @@ const init = id => {
     return false
   }
 
-  if (
-    (user.expires < Date.now()) ||
-    !user.period ||
-    !user.career
-  ) {
-    const session = inacap()
-    bot.sendMessage(id, 'Re-logueando Inacap')
-
-    return {
-      login: () => session
-        .login(btoa(user.rut), btoa(user.password))
-        .then(({ cookies }) => {
-          user.cookies = cookies
-          user.expires = minutes()
-          return session.getPeriods()
-        })
-        .then(() => updatePeriods(session, user)),
-      session
-    }
-  }
-
-  const session = inacap(user.cookies)
-  const { period, career } = user
   return {
-    login: () => Promise.resolve({ period, career }),
-    session
+    user,
+    session: inacap(user.cookies)
   }
 }
 
-bot.onText(/^\/?login (.{1,}) (.{1,})$/, (msg, match) => {
+bot.onText(/^\/?login ([\w-]{1,}) (.{1,})/, (msg, match) => {
   const rut = match[1]
   const password = match[2]
   const user = findUser(msg.from.id)
@@ -112,28 +77,28 @@ bot.onText(/^\/?login (.{1,}) (.{1,})$/, (msg, match) => {
   }
 
   bot.sendMessage(msg.from.id, 'Ingresando a Inacap...')
-
-  const session = inacap()
-  session
+  inacap()
     .login(rut, password)
-    .then(({ cookies }) =>
-      db.get('users')
+    .then(({ cookies }) => {
+      const user = db
+        .get('users')
         .push({
           id: msg.from.id,
           rut: atob(rut),
           password: atob(password),
-          cookies,
-          expires: minutes()
+          cookies
         })
         .last()
         .value()
-    )
-    .then(() => updatePeriods(session, findUser(msg.from.id)))
+
+      intervals[msg.from.id] = autoLogin(user)
+      return login(findUser(msg.from.id))
+    })
     .then(() => {
       bot.sendMessage(msg.from.id, 'Login exitoso, para salir usa /logout')
     })
     .catch(err => {
-      console.log(err)
+      console.error(err)
       bot.sendMessage(msg.from.id, 'Usuario y/o contraseña incorrectos.')
     })
 })
@@ -141,26 +106,22 @@ bot.onText(/^\/?login (.{1,}) (.{1,})$/, (msg, match) => {
 bot.onText(/\/?logout/, (msg, match) => {
   const removed = db.get('users').remove({ id: msg.from.id }).value()
   if (removed) {
+    clearInterval(intervals[msg.from.id])
+    delete intervals[msg.from.id]
     bot.sendMessage(msg.from.id, 'Sesión terminada.')
   }
 })
 
-bot.onText(/start/, (msg, match) =>
+bot.onText(/\/?start/, (msg, match) =>
   bot.sendMessage(msg.from.id, 'Ingresa usando /login rut contraseña'))
 
 // 3spooky5me
-bot.onText(/\/?autologin/, msg => {
-  autoLogin(findUser(msg.from.id))
-  bot.sendMessage(msg.chat.id, 'Autologin activado.')
-})
 bot.onText(/\/?doot/, msg => bot.sendMessage(msg.chat.id, '🎺🎺💀'))
 
 // Grades
 bot.onText(/^\/?n(?:\w{1,})?\s?(.{1,})?$/, (msg, match) => {
-  const user = init(msg.from.id)
-  user && user.login()
-    .then(({ career, period }) =>
-      user.session.getGrades(period.peri_ccod, career.carr_ccod))
+  const { user, session } = init(msg.from.id)
+  session && session.getGrades(user.period.peri_ccod, user.career.carr_ccod)
     .then(({ informacion_notas: { listado_asignaturas } }) => {
       const term = match[1] ? deburr(match[1]) : null
       const list = term
@@ -176,7 +137,7 @@ bot.onText(/^\/?n(?:\w{1,})?\s?(.{1,})?$/, (msg, match) => {
         return
       }
 
-      const cookies = user.session.cookies
+      const { cookies } = session
       const nombre = cookies.getValue(cookies.get('NOMBRE_COMPLETO_H'))
       let message = `*${words(nombre).join(' ')}*\n\n`
 
@@ -184,7 +145,10 @@ bot.onText(/^\/?n(?:\w{1,})?\s?(.{1,})?$/, (msg, match) => {
         const gradesList = item.listado_evaluaciones.reduce((prev, curr) => {
           const { fecha, nota, ponderacion, prom_calificacion } = curr
           if (!nota) return prev
-          prev += `\t\t*${fecha}* | nota: *${nota}* | pon: *${ponderacion}* | curso: ${prom_calificacion}\n`
+          prev += `\t\t*${fecha}* | `
+          prev += `nota: *${nota}* | `
+          prev += `pon: *${ponderacion}* | `
+          prev += `curso: ${prom_calificacion}\n`
           return prev
         }, '')
 
@@ -206,43 +170,43 @@ bot.onText(/^\/?n(?:\w{1,})?\s?(.{1,})?$/, (msg, match) => {
 
 // Schedule
 bot.onText(/^\/?h(?:\w{1,})?\s?(\w{1,})?$/, (msg, match) => {
-  const user = init(msg.from.id)
-  user && user.login()
-    .then(({ period }) => user.session.getSchedule(period.peri_ccod))
-    .then((data) => {
-      let schedule = data.filter(item => {
-        const now = new Date()
-        const classDate = new Date(item.start)
-        return classDate.getMonth() === now.getMonth() &&
-          classDate.getDate() === now.getDate()
-      })
-
-      if (match[1]) {
-        schedule = data.filter(item => {
-          const days = ['l', 'ma', 'mi', 'j', 'v', 's']
-          const dayIndex = days.findIndex(e => match[1].startsWith(e)) + 1
-          const classDate = new Date(item.start)
-          return classDate.getMonth() === new Date().getMonth() &&
-            classDate.getDay() === dayIndex || parseInt(match[1])
-        })
-      }
-
-      let message = schedule.reduce((prev, curr) => {
-        if (!curr.data.asignatura) return prev
-        if (match[1]) {
-          prev += `*Fecha: ${curr.data.fecha}*\n`
-        }
-        prev += `*Asignatura*: ${curr.data.asignatura}\n`
-        prev += `*Sala*: ${curr.data.sala}\n`
-        prev += `*Inicio*: ${curr.data.hora_inicio}\n`
-        prev += `*Término*: ${curr.data.hora_termino}\n`
-        prev += `*Profesor*: ${curr.data.profesor}\n\n`
-        return prev
-      }, '')
-
-      if (!message) message = `No hay clases asignadas${!match[1] ? ' para hoy' : ''}.`
-      bot.sendMessage(msg.chat.id, message, { parse_mode: 'markdown' })
+  const { user, session } = init(msg.from.id)
+  session && session.getSchedule(user.period.peri_ccod).then(data => {
+    let schedule = data.filter(item => {
+      const now = new Date()
+      const classDate = new Date(item.start)
+      return classDate.getMonth() === now.getMonth() &&
+        classDate.getDate() === now.getDate()
     })
+
+    if (match[1]) {
+      schedule = data.filter(item => {
+        const days = ['l', 'ma', 'mi', 'j', 'v', 's']
+        const dayIndex = days.findIndex(e => match[1].startsWith(e)) + 1
+        const classDate = new Date(item.start)
+        return classDate.getMonth() === new Date().getMonth() &&
+          classDate.getDay() === dayIndex || parseInt(match[1])
+      })
+    }
+
+    let message = schedule.reduce((prev, curr) => {
+      if (!curr.data.asignatura) return prev
+      if (match[1]) prev += `*Fecha: ${curr.data.fecha}*\n`
+      prev += `*Asignatura*: ${curr.data.asignatura}\n`
+      prev += `*Sala*: ${curr.data.sala}\n`
+      prev += `*Inicio*: ${curr.data.hora_inicio}\n`
+      prev += `*Término*: ${curr.data.hora_termino}\n`
+      prev += `*Profesor*: ${curr.data.profesor}\n\n`
+      return prev
+    }, '')
+
+    if (!message) message = `No hay clases asignadas${!match[1] ? ' para hoy' : ''}.`
+    bot.sendMessage(msg.chat.id, message, { parse_mode: 'markdown' })
+  })
 })
 
 console.log('Starting bot...')
+db.get('users').value().forEach(user => {
+  console.log('autoLogin', user.id)
+  autoLogin(user)
+})
