@@ -135,9 +135,11 @@ bot.onText(/logout/, (msg, match) => {
 bot.onText(/start/, (msg, match) =>
   bot.sendMessage(msg.from.id, 'Ingresa usando /login rut contraseña'))
 
+// 3spooky5me
 bot.onText(/doot/, msg => bot.sendMessage(msg.chat.id, '🎺🎺💀'))
 
-bot.onText(/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
+// Grades
+bot.onText(/n(?:\w{1,})?\s?(.{1,})?/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
     .then(({ career, period }) =>
@@ -185,7 +187,8 @@ bot.onText(/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
     })
 })
 
-bot.onText(/horario(?:@\w{1,})?\s?(\w{1,})?/, (msg, match) => {
+// Schedule
+bot.onText(/h(?:\w{1,})?\s?(\w{1,})?/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
     .then(({ period }) => user.session.getSchedule(period.peri_ccod))
@@ -220,7 +223,7 @@ bot.onText(/horario(?:@\w{1,})?\s?(\w{1,})?/, (msg, match) => {
         return prev
       }, '')
 
-      if (!message) message = 'No hay clases asignadas para hoy.'
+      if (!message) message = `No hay clases asignadas${!match[1] ? ' para hoy' : ''}.`
       bot.sendMessage(msg.chat.id, message, { parse_mode: 'markdown' })
     })
 })
