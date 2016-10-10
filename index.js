@@ -30,8 +30,29 @@ const atob = str => new Buffer(str).toString('base64')
 const btoa = str => new Buffer(str, 'base64').toString('ascii')
 const minutes = (n = 15) => Date.now() + n * 60 * 1000
 
+const findUser = id => db.get('users').find({ id }).value()
+
+const updatePeriods = (session, user) => {
+  let period = null
+  return session.getPeriods()
+    .then(periods => {
+      period = periods[0]
+      user.period = period
+      return session.getCareers(period.peri_ccod)
+    })
+    .then(careers => {
+      const career = careers[0]
+      user.career = career
+
+      return {
+        period,
+        career
+      }
+    })
+}
+
 const init = id => {
-  const user = db.get('users').find({ id }).value()
+  const user = findUser(id)
 
   if (!user) {
     bot.sendMessage(id, 'Debes loguearte primero. /login rut contraseña')
@@ -44,7 +65,6 @@ const init = id => {
     !user.career
   ) {
     const session = inacap()
-    let period = null
     bot.sendMessage(id, 'Re-logueando Inacap')
 
     return {
@@ -55,20 +75,7 @@ const init = id => {
           user.expires = minutes()
           return session.getPeriods()
         })
-        .then(periods => {
-          period = periods[0]
-          user.period = period
-          return session.getCareers(period.peri_ccod)
-        })
-        .then(careers => {
-          const career = careers[0]
-          user.career = career
-
-          return {
-            period,
-            career
-          }
-        }),
+        .then(() => updatePeriods(session, user)),
       session
     }
   }
@@ -84,19 +91,20 @@ const init = id => {
 bot.onText(/login (.{1,}) (.{1,})/, (msg, match) => {
   const rut = match[1]
   const password = match[2]
+  const user = findUser(msg.from.id)
 
-  if (db.get('users').find({ id: msg.from.id }).value()) {
+  if (user) {
     bot.sendMessage(msg.from.id, 'Ya te encuentras logueado.')
     return
   }
 
   bot.sendMessage(msg.from.id, 'Ingresando a Inacap...')
 
-  inacap().login(rut, password)
-    .then(({ cookies }) => {
-      bot.sendMessage(msg.from.id, 'Login exitoso, para salir usa /logout')
-
-      return db.get('users')
+  const session = inacap()
+  session
+    .login(rut, password)
+    .then(({ cookies }) =>
+      db.get('users')
         .push({
           id: msg.from.id,
           rut: atob(rut),
@@ -106,6 +114,10 @@ bot.onText(/login (.{1,}) (.{1,})/, (msg, match) => {
         })
         .last()
         .value()
+    )
+    .then(() => updatePeriods(session, findUser(msg.from.id)))
+    .then(() => {
+      bot.sendMessage(msg.from.id, 'Login exitoso, para salir usa /logout')
     })
     .catch(err => {
       console.log(err)
@@ -173,7 +185,7 @@ bot.onText(/notas(?:@\w{1,})?\s?(.{1,})?/, (msg, match) => {
     })
 })
 
-bot.onText(/horario(?:@\w{1,})?\s?(\d)?/, (msg, match) => {
+bot.onText(/horario(?:@\w{1,})?\s?(\w{1,})?/, (msg, match) => {
   const user = init(msg.from.id)
   user && user.login()
     .then(({ period }) => user.session.getSchedule(period.peri_ccod))
@@ -187,10 +199,11 @@ bot.onText(/horario(?:@\w{1,})?\s?(\d)?/, (msg, match) => {
 
       if (match[1]) {
         schedule = data.filter(item => {
-          const now = new Date()
+          const days = ['l', 'ma', 'mi', 'j', 'v', 's']
+          const dayIndex = days.findIndex(e => match[1].startsWith(e)) + 1
           const classDate = new Date(item.start)
-          return classDate.getMonth() === now.getMonth() &&
-            classDate.getDay() === parseInt(match[1])
+          return classDate.getMonth() === new Date().getMonth() &&
+            classDate.getDay() === dayIndex || parseInt(match[1])
         })
       }
 
