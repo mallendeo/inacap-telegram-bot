@@ -122,15 +122,15 @@ bot.onText(/\/?doot/, msg => bot.sendMessage(msg.chat.id, '🎺🎺💀'))
 bot.onText(/^\/?n(?:\w{1,})?\s?(.{1,})?$/, (msg, match) => {
   const { user, session } = init(msg.from.id)
   session && session.getGrades(user.period.peri_ccod, user.career.carr_ccod)
-    .then(({ informacion_notas: { listado_asignaturas } }) => {
+    .then(data => {
       const term = match[1] ? deburr(match[1]) : null
       const list = term
-        ? listado_asignaturas.filter(item => (
+        ? data.informacion_notas.listado_asignaturas.filter(item => (
             deburr(item.nombre_asigntura.toLowerCase()).includes(term) ||
             deburr(item.nombre_profesor.toLowerCase()).includes(term)
           )
         )
-        : listado_asignaturas
+        : data.informacion_notas.listado_asignaturas
 
       if (!list.length && term) {
         bot.sendMessage(msg.chat.id, 'No se encontró la asignatura.')
@@ -143,12 +143,11 @@ bot.onText(/^\/?n(?:\w{1,})?\s?(.{1,})?$/, (msg, match) => {
 
       list.forEach(item => {
         const gradesList = item.listado_evaluaciones.reduce((prev, curr) => {
-          const { fecha, nota, ponderacion, prom_calificacion } = curr
-          if (!nota) return prev
-          prev += `\t\t*${fecha}* | `
-          prev += `nota: *${nota}* | `
-          prev += `pon: *${ponderacion}* | `
-          prev += `curso: ${prom_calificacion}\n`
+          if (!curr.nota) return prev
+          prev += `\t\t*${curr.fecha}* | `
+          prev += `nota: *${curr.nota}* | `
+          prev += `pon: *${curr.ponderacion}* | `
+          prev += `curso: ${curr.prom_calificacion}\n`
           return prev
         }, '')
 
@@ -189,18 +188,34 @@ bot.onText(/^\/?h(?:\w{1,})?\s?(\w{1,})?$/, (msg, match) => {
       })
     }
 
-    let message = schedule.reduce((prev, curr) => {
-      if (!curr.data.asignatura) return prev
-      if (match[1]) prev += `*Fecha: ${curr.data.fecha}*\n`
-      prev += `*Asignatura*: ${curr.data.asignatura}\n`
-      prev += `*Sala*: ${curr.data.sala}\n`
-      prev += `*Inicio*: ${curr.data.hora_inicio}\n`
-      prev += `*Término*: ${curr.data.hora_termino}\n`
-      prev += `*Profesor*: ${curr.data.profesor}\n\n`
+    let message = schedule.reduce((prev, { data }) => {
+      if (!data.asignatura) return prev
+      if (match[1]) prev += `*Fecha: ${data.fecha}*\n`
+      prev += `*Asignatura*: ${data.asignatura}\n`
+      prev += `*Sala*: ${data.sala}\n`
+      prev += `*Inicio*: ${data.hora_inicio}\n`
+      prev += `*Término*: ${data.hora_termino}\n`
+      prev += `*Profesor*: ${data.profesor}\n\n`
       return prev
     }, '')
 
     if (!message) message = `No hay clases asignadas${!match[1] ? ' para hoy' : ''}.`
+    bot.sendMessage(msg.chat.id, message, { parse_mode: 'markdown' })
+  })
+})
+
+// Attendance
+bot.onText(/^\/?a(?:\w{1,})?\s?(\w{1,})?$/, (msg, match) => {
+  const { user, session } = init(msg.from.id)
+  session && session.getAttendance(user.period.peri_ccod).then(data => {
+    const items = match[1] ? data.filter(item => item[3].includes(match[1])) : data
+
+    const message = items.reduce((prev, curr) => {
+      prev += `*${curr[3]}*\n`
+      prev += `${curr[6]}% de ${curr[7]}%\n\n`
+      return prev
+    }, '')
+
     bot.sendMessage(msg.chat.id, message, { parse_mode: 'markdown' })
   })
 })
